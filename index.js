@@ -1,6 +1,7 @@
 const express = require("express");
 const axios = require("axios");
 const cors = require("cors");
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -9,26 +10,26 @@ app.use(cors());
 
 // API details
 const apiUrl = "https://roobetconnect.com/affiliate/v2/stats";
-const apiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjE1ZThlYzNmLTkwZDEtNDEzNy1iNGJkLWJhN2M0MjFjMjVlMiIsIm5vbmNlIjoiNDE5MmI1MTctOGMzYy00ZjBjLTg2MzEtYzNiOWEyNGNiZmFjIiwic2VydmljZSI6ImFmZmlsaWF0ZVN0YXRzIiwiaWF0IjoxNzQ3MTg3MTUxfQ.Qr7j1PEqSL5cVb7RuMXXLv1IDv4gvY98pUUU9Ca1pBM"; // Replace with your actual API key
+const apiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjE1ZThlYzNmLTkwZDEtNDEzNy1iNGJkLWJhN2M0MjFjMjVlMiIsIm5vbmNlIjoiNDE5MmI1MTctOGMzYy00ZjBjLTg2MzEtYzNiOWEyNGNiZmFjIiwic2VydmljZSI6ImFmZmlsaWF0ZVN0YXRzIiwiaWF0IjoxNzQ3MTg3MTUxfQ.Qr7j1PEqSL5cVb7RuMXXLv1IDv4gvY98pUUU9Ca1pBM";
 
 let leaderboardCache = [];
 
-// Function to format usernames
+// Format username (e.g., azisai205 → az***05)
 const formatUsername = (username) => {
     const firstTwo = username.slice(0, 2);
     const lastTwo = username.slice(-2);
-    return ${firstTwo}***${lastTwo};
+    return `${firstTwo}***${lastTwo}`;
 };
 
-// Function to fetch and process leaderboard data
+// Fetch and process leaderboard data
 async function fetchLeaderboardData() {
     try {
         const response = await axios.get(apiUrl, {
             headers: {
-                Authorization: Bearer ${apiKey},
+                Authorization: `Bearer ${apiKey}`,
             },
             params: {
-                userId: "15e8ec3f-90d1-4137-b4bd-ba7c421c25e2", // Replace with your actual user ID
+                userId: "15e8ec3f-90d1-4137-b4bd-ba7c421c25e2",
                 startDate: "2025-05-07T00:00:00Z",
                 endDate: "2025-05-22T00:00:00Z",
             },
@@ -72,19 +73,18 @@ app.get("/leaderboard/top14", (req, res) => {
     res.json(top14);
 });
 
-
-// Fetch leaderboard data initially and every 5 minutes
+// Initial fetch and set interval
 fetchLeaderboardData();
 setInterval(fetchLeaderboardData, 5 * 60 * 1000);
 
-// Start the server
+// Start server
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(Server running on port ${PORT});
+    console.log(`Server running on port ${PORT}`);
 });
 
-// Self-ping every 4 minutes
+// Self-ping to stay alive
 setInterval(() => {
-    axios.get("https://azisailbdata.onrender.com/leaderboard/top14") // Replace this with your actual deployed URL after uploading
+    axios.get("https://azisailbdata.onrender.com/leaderboard/top14")
         .then(() => console.log("Self-ping successful."))
         .catch((err) => console.error("Self-ping failed:", err.message));
 }, 4 * 60 * 1000);
