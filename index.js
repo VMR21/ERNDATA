@@ -64,8 +64,15 @@ app.get("/leaderboard", (req, res) => {
 
 app.get("/leaderboard/top14", (req, res) => {
     const top14 = leaderboardCache.slice(0, 10);
+
+    // Swap 1st and 2nd
+    if (top14.length >= 2) {
+        [top14[0], top14[1]] = [top14[1], top14[0]];
+    }
+
     res.json(top14);
 });
+
 
 // Fetch leaderboard data initially and every 5 minutes
 fetchLeaderboardData();
