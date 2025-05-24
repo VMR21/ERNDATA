@@ -24,14 +24,36 @@ const formatUsername = (username) => {
 // Fetch and process leaderboard data
 async function fetchLeaderboardData() {
     try {
+        const now = new Date();
+        const nowUTC = new Date(now.getTime() + now.getTimezoneOffset() * 60000);
+        const currentUTCDay = nowUTC.getUTCDay(); // 0 = Sun, 6 = Sat
+        const currentUTCDate = nowUTC.getUTCDate();
+        const currentUTCMonth = nowUTC.getUTCMonth();
+        const currentUTCYear = nowUTC.getUTCFullYear();
+
+        // Find the most recent Saturday 00:00:01 UTC
+        const daysSinceSaturday = (currentUTCDay + 1) % 7;
+        const startDateObj = new Date(Date.UTC(
+            currentUTCYear,
+            currentUTCMonth,
+            currentUTCDate - daysSinceSaturday,
+            0, 0, 1
+        ));
+
+        // End = following Friday 23:59:59 UTC
+        const endDateObj = new Date(startDateObj.getTime() + 6 * 24 * 60 * 60 * 1000 + 86399000);
+
+        const startDate = startDateObj.toISOString();
+        const endDate = endDateObj.toISOString();
+
         const response = await axios.get(apiUrl, {
             headers: {
                 Authorization: `Bearer ${apiKey}`,
             },
             params: {
                 userId: "15e8ec3f-90d1-4137-b4bd-ba7c421c25e2",
-                startDate: "2025-05-07T00:00:00Z",
-                endDate: "2025-05-22T00:00:00Z",
+                startDate,
+                endDate,
             },
         });
 
