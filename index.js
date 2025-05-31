@@ -26,22 +26,14 @@ async function fetchLeaderboardData() {
     try {
         const now = new Date();
         const nowUTC = new Date(now.getTime() + now.getTimezoneOffset() * 60000);
-        const currentUTCDay = nowUTC.getUTCDay(); // 0 = Sun, 6 = Sat
-        const currentUTCDate = nowUTC.getUTCDate();
-        const currentUTCMonth = nowUTC.getUTCMonth();
-        const currentUTCYear = nowUTC.getUTCFullYear();
+        const year = nowUTC.getUTCFullYear();
+        const month = nowUTC.getUTCMonth();
 
-        // Find the most recent Saturday 00:00:01 UTC
-        const daysSinceSaturday = (currentUTCDay + 1) % 7;
-        const startDateObj = new Date(Date.UTC(
-            currentUTCYear,
-            currentUTCMonth,
-            currentUTCDate - daysSinceSaturday,
-            0, 0, 1
-        ));
+        // Start of month: 1st at 00:00 UTC
+        const startDateObj = new Date(Date.UTC(year, month, 1, 0, 0, 0));
 
-        // End = following Friday 23:59:59 UTC
-        const endDateObj = new Date(startDateObj.getTime() + 6 * 24 * 60 * 60 * 1000 + 86399000);
+        // End of month: last day at 23:59 UTC
+        const endDateObj = new Date(Date.UTC(year, month + 1, 0, 23, 59, 0));
 
         const startDate = startDateObj.toISOString();
         const endDate = endDateObj.toISOString();
