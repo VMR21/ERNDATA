@@ -29,10 +29,15 @@ async function fetchLeaderboardData() {
         const year = nowUTC.getUTCFullYear();
         const month = nowUTC.getUTCMonth();
 
-        // Start of month: 1st at 00:00 UTC
-        const startDateObj = new Date(Date.UTC(year, month, 1, 0, 0, 0));
+        let startDateObj;
 
-        // End of month: last day at 23:59 UTC
+        // For June 2025, use fixed start date
+        if (year === 2025 && month === 5) {
+            startDateObj = new Date("2025-01-01T00:00:00.000Z");
+        } else {
+            startDateObj = new Date(Date.UTC(year, month, 1, 0, 0, 0));
+        }
+
         const endDateObj = new Date(Date.UTC(year, month + 1, 0, 23, 59, 0));
 
         const startDate = startDateObj.toISOString();
