@@ -1,109 +1,114 @@
-const express = require("express");
-const axios = require("axios");
-const cors = require("cors");
+import express from "express";
+import fetch from "node-fetch";
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
+const SELF_URL = "https://erndata.onrender.com/leaderboard/top14";
+const API_KEY = "0mi847CeueWrlkZIOBhU7fxjYTynPZlp";
 
-// Use CORS middleware
-app.use(cors());
+let cachedData = [];
 
-// API details
-const apiUrl = "https://roobetconnect.com/affiliate/v2/stats";
-const apiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjE1ZThlYzNmLTkwZDEtNDEzNy1iNGJkLWJhN2M0MjFjMjVlMiIsIm5vbmNlIjoiNDE5MmI1MTctOGMzYy00ZjBjLTg2MzEtYzNiOWEyNGNiZmFjIiwic2VydmljZSI6ImFmZmlsaWF0ZVN0YXRzIiwiaWF0IjoxNzQ3MTg3MTUxfQ.Qr7j1PEqSL5cVb7RuMXXLv1IDv4gvY98pUUU9Ca1pBM";
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type");
+  next();
+});
 
-let leaderboardCache = [];
-
-// Format username (e.g., azisai205 → az***05)
-const formatUsername = (username) => {
-    const firstTwo = username.slice(0, 2);
-    const lastTwo = username.slice(-2);
-    return `${firstTwo}***${lastTwo}`;
-};
-
-// Fetch and process leaderboard data
-async function fetchLeaderboardData() {
-    try {
-        const now = new Date();
-        const nowUTC = new Date(now.getTime() + now.getTimezoneOffset() * 60000);
-        const year = nowUTC.getUTCFullYear();
-        const month = nowUTC.getUTCMonth();
-
-        let startDateObj;
-
-        // For June 2025, use fixed start date
-        if (year === 2025 && month === 5) {
-            startDateObj = new Date("2025-01-01T00:00:00.000Z");
-        } else {
-            startDateObj = new Date(Date.UTC(year, month, 1, 0, 0, 0));
-        }
-
-        const endDateObj = new Date(Date.UTC(year, month + 1, 0, 23, 59, 0));
-
-        const startDate = startDateObj.toISOString();
-        const endDate = endDateObj.toISOString();
-
-        const response = await axios.get(apiUrl, {
-            headers: {
-                Authorization: `Bearer ${apiKey}`,
-            },
-            params: {
-                userId: "15e8ec3f-90d1-4137-b4bd-ba7c421c25e2",
-                startDate,
-                endDate,
-            },
-        });
-
-        const data = response.data;
-
-        leaderboardCache = data
-            .filter((player) => player.username !== "azisai205")
-            .sort((a, b) => b.weightedWagered - a.weightedWagered)
-            .slice(0, 100000)
-            .map((player) => ({
-                username: formatUsername(player.username),
-                wagered: Math.round(player.weightedWagered),
-                weightedWager: Math.round(player.weightedWagered),
-            }));
-
-        console.log("Leaderboard updated:", leaderboardCache);
-    } catch (error) {
-        console.error("Error fetching leaderboard data:", error.message);
-    }
+function maskUsername(username) {
+  if (!username) return "Anonymous";
+  if (username.length <= 4) return username;
+  return username.slice(0, 2) + "***" + username.slice(-2);
 }
 
-// Routes
-app.get("/", (req, res) => {
-    res.send("Welcome to the Leaderboard API. Access /leaderboard or /leaderboard/top14");
-});
+// 🧮 Calculate weekly range based on base time
+function getWeeklyRange(offset = 0) {
+  const base = new Date(Date.UTC(2025, 6, 22, 0, 0, 1)); // July 22, 2025 00:00:01 UTC
+  const now = new Date();
 
-app.get("/leaderboard", (req, res) => {
-    res.json(leaderboardCache);
-});
+  const weekMs = 7 * 24 * 60 * 60 * 1000;
+  let diff = now.getTime() - base.getTime();
+  if (diff < 0) diff = 0;
+
+  const weekIndex = Math.floor(diff / weekMs) + offset;
+  const start = new Date(base.getTime() + weekIndex * weekMs);
+  const end = new Date(start.getTime() + weekMs - 1000); // till 23:59:59
+
+  return {
+    startStr: start.toISOString().slice(0, 10),
+    endStr: end.toISOString().slice(0, 10)
+  };
+}
+
+function getApiUrl(offset = 0) {
+  const { startStr, endStr } = getWeeklyRange(offset);
+  return `https://services.rainbet.com/v1/external/affiliates?start_at=${startStr}&end_at=${endStr}&key=${API_KEY}`;
+}
+
+async function fetchAndCacheData() {
+  try {
+    const response = await fetch(getApiUrl(0));
+    const json = await response.json();
+    if (!json.affiliates) throw new Error("No data");
+
+    const sorted = json.affiliates.sort(
+      (a, b) => parseFloat(b.wagered_amount) - parseFloat(a.wagered_amount)
+    );
+
+    const top10 = sorted.slice(0, 10);
+    if (top10.length >= 2) [top10[0], top10[1]] = [top10[1], top10[0]];
+
+    cachedData = top10.map(entry => ({
+      username: maskUsername(entry.username),
+      wagered: Math.round(parseFloat(entry.wagered_amount)),
+      weightedWager: Math.round(parseFloat(entry.wagered_amount)),
+    }));
+
+    console.log(`[✅] Leaderboard updated`);
+  } catch (err) {
+    console.error("[❌] Failed to fetch Rainbet data:", err.message);
+  }
+}
+
+fetchAndCacheData();
+setInterval(fetchAndCacheData, 5 * 60 * 1000); // every 5 minutes
 
 app.get("/leaderboard/top14", (req, res) => {
-    const top14 = leaderboardCache.slice(0, 10);
-
-    // Swap 1st and 2nd
-    if (top14.length >= 2) {
-        [top14[0], top14[1]] = [top14[1], top14[0]];
-    }
-
-    res.json(top14);
+  res.json(cachedData);
 });
 
-// Initial fetch and set interval
-fetchLeaderboardData();
-setInterval(fetchLeaderboardData, 5 * 60 * 1000);
+app.get("/leaderboard/prev", async (req, res) => {
+  try {
+    const url = getApiUrl(-1);
+    const response = await fetch(url);
+    const json = await response.json();
 
-// Start server
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on port ${PORT}`);
+    if (!json.affiliates) throw new Error("No previous data");
+
+    const sorted = json.affiliates.sort(
+      (a, b) => parseFloat(b.wagered_amount) - parseFloat(a.wagered_amount)
+    );
+
+    const top10 = sorted.slice(0, 10);
+    if (top10.length >= 2) [top10[0], top10[1]] = [top10[1], top10[0]];
+
+    const processed = top10.map(entry => ({
+      username: maskUsername(entry.username),
+      wagered: Math.round(parseFloat(entry.wagered_amount)),
+      weightedWager: Math.round(parseFloat(entry.wagered_amount)),
+    }));
+
+    res.json(processed);
+  } catch (err) {
+    console.error("[❌] Failed to fetch previous leaderboard:", err.message);
+    res.status(500).json({ error: "Failed to fetch previous leaderboard data." });
+  }
 });
 
-// Self-ping to stay alive
 setInterval(() => {
-    axios.get("https://azisailbdata.onrender.com/leaderboard/top14")
-        .then(() => console.log("Self-ping successful."))
-        .catch((err) => console.error("Self-ping failed:", err.message));
-}, 4 * 60 * 1000);
+  fetch(SELF_URL)
+    .then(() => console.log(`[🔁] Self-pinged ${SELF_URL}`))
+    .catch(err => console.error("[⚠️] Self-ping failed:", err.message));
+}, 270000); // every 4.5 mins
+
+app.listen(PORT, () => console.log(`🚀 Running on port ${PORT}`));
